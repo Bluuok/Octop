@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### 新增
+- 专家团对话可将所选模型应用到所有参与专家，仅覆盖当前对话的派工和汇总，不修改专家默认模型；开关默认关闭，选择 Auto 时禁用（#1546）。
 - GitHub 发版产出飞牛 ARM 安装包：官方镜像改为 `linux/amd64` + `linux/arm64` 多架构（同一份 Docker FPK 在 ARM 飞牛上拉对应镜像层）；本地版另挂 `Octop-fnos-native-arm64-<ver>.fpk`。ARM 飞牛优先用 Docker 版；本地版装错架构会在安装或启动时报错。
 
 ### 变更
