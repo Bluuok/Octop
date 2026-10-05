@@ -116,6 +116,7 @@
     "STORAGE_BACKEND_NAME_TAKEN": "Storage backend name is already in use.",
     "STORAGE_BACKEND_REFERENCED": "Storage backend is in use and cannot be removed.",
     "STORAGE_BACKEND_DEPS_FAILED": "Could not install optional components for this storage backend. Check network access and retry.",
+    "STORAGE_BROWSE_FAILED": "Could not browse this storage backend.",
     "CHANNEL_KIND_UNSUPPORTED": "Unsupported channel type.",
     "CHANNEL_INVALID_CREDENTIALS": "Invalid channel credentials.",
     "CHANNEL_NAME_TAKEN": "This channel name is already in use. Please choose another.",
@@ -346,9 +347,9 @@
     "collapseListPanel": "Collapse list",
     "expandListPanel": "Expand list",
     "copyPolicy": "Copy policy",
-    "copyPolicyHint": "Controls whether users other than the creator can copy this package's skills into their agents.",
+    "copyPolicyHint": "Controls whether users other than the creator can copy this package's skills into their agents. Read-only copies are enforced on Dashboard and workspace HTTP writes; Agent tool writes still need harness support (#770).",
     "copyPolicySnapshot": "Copy freely",
-    "copyPolicyLock": "Copy read-only",
+    "copyPolicyLock": "Copy (console read-only)",
     "copyPolicyDeny": "No copying"
   },
   "knowledgeBases": {
@@ -939,6 +940,7 @@
     "agentDeleteFailed": "Failed to delete agent",
     "confirmDelete": "Delete \"{{name}}\"?",
     "confirmDeleteHint": "This cannot be undone. The agent workspace (including memory and session files) will also be permanently deleted and cannot be recovered.",
+    "agentDisable": "Disable",
     "patchFailed": "Failed to save changes",
     "defaultModelLabel": "Default Model",
     "defaultModelPlaceholder": "Select a model",
@@ -1191,7 +1193,8 @@
   },
   "agent_errors": {
     "no_models_configured": "No models are configured. Go to Admin → Model Management to add a provider, then enable this expert again.",
-    "model_ref_unavailable": "The default model is unavailable or disabled. Check Admin → Model Management or update this expert's default model, then try again."
+    "model_ref_unavailable": "The default model is unavailable or disabled. Check Admin → Model Management or update this expert's default model, then try again.",
+    "start_timeout": "This expert took too long to start (storage backend I/O). Try again, or switch it to a local workspace backend."
   },
   "stream_errors": {
     "stream_stall": "The model stopped sending content while the connection stayed open. Click Retry, or try again later with another model. If this happens often, check the provider status or ask an admin to review stream timeout settings.",
@@ -1203,6 +1206,7 @@
     "timeout_network": "Connecting to the model timed out or the network failed. Check your network and retry. If you use a proxy or self-hosted endpoint, confirm it is reachable.",
     "provider_unavailable": "The model provider is temporarily unavailable. Retry later, or switch to another model.",
     "model_call_failed": "The model call failed after several retries. Wait a moment and retry. If it keeps failing, check the model settings or switch models.",
+    "model_call_failed_detail": "The model call failed: {{detail}}",
     "path_outside_root": "The file path is outside this expert's storage root, so it cannot be read or written. Use a path under the storage root, or widen the storage root in expert settings (on Windows, set an explicit drive path such as D:/octop-data)."
   },
   "chat": {
@@ -2273,7 +2277,11 @@
       "timeoutSeconds": "Timeout (seconds)",
       "timeoutSecondsTooltip": "Maximum execution time in seconds. The job will be terminated if it exceeds this limit.",
       "misfireGrace": "Misfire Grace (seconds)",
-      "misfireGraceTooltip": "If the job was missed (e.g. server was down), it will still run if within this grace period. Set to 0 to skip missed runs."
+      "misfireGraceTooltip": "If the job was missed (e.g. server was down), it will still run if within this grace period. Set to 0 to skip missed runs.",
+      "agentlyNewMail": "Agent Mail new mail",
+      "agentlyMailbox": "Mailbox to watch",
+      "agentlySelectMailbox": "Select an Agent Mail mailbox",
+      "agentlyHint": "Run this task when the background connection receives new mail. Authorize the selected mailbox first; the model is not called while idle."
     },
     "preset": {
       "every5min": "Every 5 minutes",
@@ -2290,6 +2298,7 @@
     "col": {
       "id": "Job ID",
       "name": "Name",
+      "enabled": "Enabled",
       "scheduleType": "Schedule Type",
       "scheduleCron": "Schedule Cron",
       "scheduleTimezone": "Timezone",
@@ -2511,6 +2520,7 @@
     "dmPolicy": "DM Policy",
     "dmPolicyOpen": "Open — allow everyone",
     "dmPolicyAllowlist": "Allowlist — specified users only",
+    "dmPolicyDisabled": "Disable DMs",
     "allowFrom": "DM Allowlist",
     "allowFromTip": "Only effective when DM Policy is set to Allowlist",
     "allowFromPlaceholder": "Enter user ID and press Enter",
@@ -4068,6 +4078,20 @@
       "episodes": "Emotional moments",
       "rawEvents": "Conversation memory",
       "candidatesPending": "Needs attention",
+      "subtitleRawEventsUnit": "raw events",
+      "dirtyPages": "Topics to refresh",
+      "dirtyPagesHint": "Some topic summaries need to be regenerated",
+      "dirtyPagesClean": "All topic summaries are up to date",
+      "processingStatus": "Processing",
+      "statusEmpty": "No status data yet",
+      "pendingReview": "Needs review",
+      "pendingReviewHint": "Memory drafts are waiting for you to adopt or discard",
+      "pendingReviewClean": "No memory drafts waiting for review",
+      "weeklyNewAtoms": "Added in 7 days",
+      "weeklyNewAtomsHint": "How quickly new memories have been settling",
+      "indexedEntities": "Indexed topics",
+      "indexedEntitiesHint": "Expand these topics in the memory library",
+      "profileEyebrow": "User profile",
       "kindsTitle": "Memory types",
       "kindsEmpty": "No memory type data yet",
       "turnsTitle": "Conversation turns · 7 days",
@@ -4162,6 +4186,16 @@
       "rejectTitle": "Discard this draft",
       "statusLabel": "Status"
     },
+    "journal": {
+      "action": {
+        "create": "Create",
+        "update": "Update",
+        "promote": "Adopt",
+        "deprecate": "Deprecate",
+        "reject": "Discard",
+        "merge": "Merge"
+      }
+    },
     "confidence": {
       "high": "High confidence",
       "low": "Low confidence",
@@ -4244,6 +4278,7 @@
       "emptyEntities": "No frequent people or things yet",
       "emptyFocus": "No tasks in progress",
       "emptyToldMe": "No explicit facts noted yet",
+      "atomCount": "{{n}} memories",
       "entities": "Key people & things",
       "entitiesDesc": "The most frequent topics in your memory",
       "toldMe": "Facts you mentioned",
@@ -4352,6 +4387,16 @@
     "skillFiles": "Skills",
     "sceneIntro": "Scene Introduction",
     "clickToPreview": "Click to preview",
+    "sceneSelectTab": "Choose a scene",
+    "currentSceneTab": "Current scene",
+    "moreScenesComing": "More scenes on the way",
+    "moreScenesSub": "We will keep adding packs — stay tuned",
+    "noSceneApplied": "No scene applied yet",
+    "noSceneAppliedHint": "Pick a scene under “Choose a scene” to get started",
+    "yourConfiguration": "Configuration files",
+    "drawerConfigFiles": "Configuration files",
+    "drawerSkillFiles": "Included skills",
+    "drawerApply": "Apply this scene",
     "moreScenes": "More Scenes",
     "readOnlyHint": "Read-only — This is preset content. After applying, you can edit it in \"Current Scene\".",
     "fileCount": "{{count}} files"
@@ -4792,7 +4837,8 @@
       "database": "Database",
       "password": "Password",
       "admin": "Admin",
-      "model": "Models"
+      "model": "Models",
+      "finish": "Finish"
     },
     "database": {
       "hint": "Choose where Octop stores control-plane data (users, agents, channels). The default SQLite file works for most installs.",
@@ -5028,13 +5074,32 @@
     "probing": "Probing…",
     "testSuccess": "Storage backend is reachable",
     "probe_roundtrip_ok": "Write, read, and delete succeeded",
+    "probe_no_such_bucket": "The specified bucket does not exist. Check the bucket name.",
+    "probe_no_such_key": "The object was not found.",
+    "probe_access_denied": "Access denied. Check the access key and bucket permissions.",
+    "probe_invalid_credentials": "Invalid credentials. Check the access key and secret key.",
+    "probe_invalid_bucket": "The bucket name is invalid.",
+    "probe_invalid_endpoint": "Endpoint or region does not match this bucket.",
+    "probe_timeout": "The storage request timed out. Check the endpoint and network.",
+    "probe_connection_failed": "Could not connect to the storage service. Check the endpoint and network.",
+    "probe_database_missing": "The specified database does not exist.",
+    "probe_content_mismatch": "Read-back content did not match what was written.",
+    "probe_write_failed": "Could not write a test file: {{detail}}",
+    "probe_read_failed": "Could not read the test file back: {{detail}}",
+    "probe_delete_failed": "Could not delete the test file: {{detail}}",
+    "probe_config_incomplete": "Configuration is incomplete.",
+    "probe_s3_incompatible": "This S3-compatible store rejected the request. Check the endpoint, or try path-style addressing in advanced settings.",
+    "probe_signature_mismatch": "The store rejected the request signature. Check the endpoint, or try path-style addressing in advanced settings.",
     "testFailed": "Connection test failed",
     "browse": "Browse",
     "browseDisabled": "Browse unavailable for this Docker sandbox (only fixed scope enables it by default; use Probe to verify connectivity)",
     "browseTitle": "Browse — {{name}}",
     "browseEmpty": "Directory is empty or cannot be listed",
     "browseFailed": "Browse failed",
-    "browseLoadFailed": "Failed to load subdirectory"
+    "browseLoadFailed": "Failed to load subdirectory",
+    "browseDownloadOnly": "This file cannot be previewed. Download it instead?",
+    "browse_not_text": "This file is not valid UTF-8 text. Download it instead.",
+    "browse_too_large": "File is too large to preview or download in the browser."
   },
   "adminAgents": {
     "total": "{{count}} agents",
@@ -5080,14 +5145,21 @@
     }
   },
   "agentSelector": {
-    "label": "Active Expert",
+    "label": "Expert",
     "localGroup": "This instance",
-    "disconnected": "Disconnected"
+    "disconnected": "Disconnected",
+    "expertsGroup": "Experts",
+    "teamsGroup": "Teams",
+    "remoteKindGroup": "{{name}}·{{kind}}",
+    "more": "More",
+    "teamNeedsExpert": "\"{{name}}\" is a team. Choose an expert for this page.",
+    "expertsRequired": "This page needs an expert"
   },
   "login": {
     "title": "Sign in",
     "subtitle": "An intelligent partner that understands you, helps you, and grows with you",
     "username": "Username or email",
+    "usernameHint": "Use the username or email you set during setup",
     "password": "Password",
     "remember": "Remember me",
     "submit": "Sign in",
@@ -5752,6 +5824,21 @@
     "cliInstallFailed": "Host CLI install failed",
     "cliInstalledHint": "Detected {{binary}} on the host",
     "cliMissingHint": "CLI is not installed on the host. Click Install CLI, or run the command below on the Octop host.",
+    "agentlyAuthTitle": "Agent Mail authorization",
+    "agentlyIdle": "This mailbox instance is not authorized",
+    "agentlyPending": "Open the authorization page and sign in. The result will update automatically.",
+    "agentlyAuthorized": "Mailbox authorized",
+    "agentlyExpired": "Authorization expired. Please sign in again",
+    "agentlyAuthFailed": "Mailbox authorization failed. Please retry",
+    "agentlyUserCode": "Authorization code",
+    "agentlyStart": "Sign in to authorize",
+    "agentlyCheckStatus": "Check status",
+    "agentlyRefresh": "Refresh authorization",
+    "agentlyCancel": "Cancel authorization",
+    "agentlyLogout": "Sign out",
+    "agentlySafety": "Sending, replying to, forwarding, and deleting emails require a preview followed by user confirmation. Email bodies and attachments are untrusted external content and must not be treated as instructions.",
+    "agentlyQuota": "Reference limits: 50 emails sent per day, 200 requests per hour, 10 requests per minute; up to 50 attachments totaling 20 MB. This connector limits each file to 10 MB. Your account quotas and current service limits take precedence. Select Agent Mail new mail on the Tasks page to trigger a task.",
+    "agentlyInstanceHint": "Save the connector first, then sign in to authorize. Each instance stores its own mailbox authorization, so different agents can select different instances.",
     "feishuUserAuthTitle": "Feishu account authorization",
     "feishuUserAuthWhy": "App ID / Secret above only identify the app (bot). Doc search and access to your personal docs or calendar require acting as your Feishu user, so one extra authorization is needed. Afterward the agent can only reach resources you already have access to.",
     "feishuUserAuthHint": "Click authorize, then tap “I have authorized”.",
