@@ -15,6 +15,7 @@ import inspect
 import json
 import logging
 from collections.abc import Callable
+from contextvars import ContextVar
 from dataclasses import fields
 from typing import TYPE_CHECKING, Any
 
@@ -69,6 +70,9 @@ _ROOM_HISTORY_LIMIT = 40
 _HOST_IDLE_POLL_SEC = 0.05
 _HOST_IDLE_WAIT_SEC = 45.0
 _TEAM_MODEL_OVERRIDE_KEY = "octop_team_model_override"
+_TEAM_WRAPUP_JOB: ContextVar[tuple[Any, InboxMessage] | None] = ContextVar(
+    "octop_team_wrapup_job", default=None
+)
 _RELAY_CHUNK_TYPES = frozenset(
     {"token", "reasoning", "tool_call_chunk", "tool_result", "error", "attachment"}
 )
@@ -1540,10 +1544,15 @@ def _patch_inbox_wrapup(
         return
 
     async def _fallback(msg: Any, result_text: str | None, error_text: str | None) -> str | None:
-        reply = await original(msg, result_text, error_text)
-        if reply is None or isinstance(reply, str):
-            return reply
-        return str(reply)
+        # Keep the job snapshot while harness builds its fallback request.
+        token = _TEAM_WRAPUP_JOB.set((inbox, msg))
+        try:
+            reply = await original(msg, result_text, error_text)
+            if reply is None or isinstance(reply, str):
+                return reply
+            return str(reply)
+        finally:
+            _TEAM_WRAPUP_JOB.reset(token)
 
     async def synthesize(
         msg: Any,
@@ -1712,6 +1721,21 @@ def wire_host_dispatch(
                 thread_id = request.get("thread_id")
             room = str(thread_id or "").strip()
             if source == "inbox" and room and is_team(agent_id):
+                fallback = _TEAM_WRAPUP_JOB.get()
+                if (
+                    fallback is not None
+                    and fallback[0] is getattr(harness_team, "inbox", None)
+                    and not isinstance(request, dict)
+                ):
+                    job = fallback[1]
+                    if (
+                        job.source_agent_id == agent_id
+                        and job.source_thread_id == room
+                        and str(job.user_id) == str(getattr(request, "user", None))
+                    ):
+                        _apply_team_model_override(
+                            request, job.metadata.get(_TEAM_MODEL_OVERRIDE_KEY)
+                        )
                 return await stream_followup(
                     request,
                     room_thread_id=room,

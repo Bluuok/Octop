@@ -179,3 +179,146 @@ async def test_wrapup_and_redispatch_use_the_same_job_snapshot(
     request = stream.await_args.args[0]
     assert request.to_runnable_config()["configurable"]["model"] == "p/selected"
     assert request.configurable[KEY] == "p/selected"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("model", ["p/selected", None, ""])
+async def test_wrapup_fallback_keeps_job_snapshot(
+    monkeypatch: pytest.MonkeyPatch, model: str | None
+) -> None:
+    team = _team()
+    team._registry.get("host").config.default_model = "p/default"
+    current = _config(model)
+    monkeypatch.setattr(team_mod, "get_config", lambda: current)
+    requests = []
+
+    async def stream_host(request: object, **_kwargs: object) -> dict:
+        requests.append(request)
+        if len(requests) == 1:
+            raise RuntimeError("transient wrap-up failure")
+        return {"messages": []}
+
+    team_mod.wire_host_dispatch(
+        team,
+        is_team=lambda aid: aid == "host",
+        stream_peer=AsyncMock(return_value={"messages": []}),
+        stream_host=stream_host,
+    )
+    result = team.submit_peer(**_kwargs(), metadata={"session_key": "sk"})
+    assert team.inbox is not None
+    team.inbox.cancel_worker()
+    current = _config("p/later")
+    job = team.inbox.get(result.job_id)
+    await team.inbox._synthesize_reply(job, "findings", None)
+
+    assert len(requests) == 2
+    for request in requests:
+        cfg = request.to_runnable_config()["configurable"]
+        assert cfg.get("model") == (model or None)
+        assert cfg.get(KEY) == (model or None)
+        assert cfg["agent_id"] == "host"
+        assert cfg["user"] == "1"
+    assert requests[1].thread_id == "room"
+    assert requests[1].configurable["session_key"] == "sk"
+    assert team._registry.get("host").config.default_model == "p/default"
+
+
+@pytest.mark.asyncio
+async def test_concurrent_wrapup_fallbacks_keep_each_room_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    team = _team()
+    current = _config("p/a", room="room-a")
+    monkeypatch.setattr(team_mod, "get_config", lambda: current)
+    requests = {"room-a": [], "room-b": []}
+    both_fallbacks = asyncio.Event()
+
+    async def stream_host(request: object, *, room_thread_id: str, **_kwargs: object) -> dict:
+        calls = requests[room_thread_id]
+        calls.append(request.to_runnable_config()["configurable"])
+        if len(calls) == 1:
+            raise RuntimeError("transient wrap-up failure")
+        if all(len(items) >= 2 for items in requests.values()):
+            both_fallbacks.set()
+        await asyncio.wait_for(both_fallbacks.wait(), timeout=5)
+        return {"messages": []}
+
+    team_mod.wire_host_dispatch(
+        team,
+        is_team=lambda aid: aid == "host",
+        stream_peer=AsyncMock(return_value={"messages": []}),
+        stream_host=stream_host,
+    )
+    first = team.submit_peer(**_kwargs("room-a"))
+    current = _config("p/b", room="room-b")
+    second = team.submit_peer(**_kwargs("room-b"))
+    assert team.inbox is not None
+    team.inbox.cancel_worker()
+    current = _config(None)
+    await asyncio.gather(
+        team.inbox._synthesize_reply(team.inbox.get(first.job_id), "a", None),
+        team.inbox._synthesize_reply(team.inbox.get(second.job_id), "b", None),
+    )
+    for room, model in (("room-a", "p/a"), ("room-b", "p/b")):
+        assert len(requests[room]) == 2
+        assert all(cfg.get("model") == model and cfg.get(KEY) == model for cfg in requests[room])
+    assert all(entry.config.default_model is None for entry in team._registry.values())
+
+
+@pytest.mark.asyncio
+async def test_non_team_wrapup_keeps_the_original_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    team = _team()
+    original_call = AsyncMock(return_value={"messages": []})
+    team._call_agent = original_call
+    monkeypatch.setattr(team_mod, "get_config", lambda: _config("p/selected"))
+    stream = AsyncMock(return_value={"messages": []})
+    team_mod.wire_host_dispatch(team, is_team=lambda _aid: False, stream_host=stream)
+    result = team.submit_peer(**_kwargs())
+    assert team.inbox is not None
+    team.inbox.cancel_worker()
+    await team.inbox._synthesize_reply(team.inbox.get(result.job_id), "findings", None)
+    request = original_call.await_args.args[1]
+    cfg = request.to_runnable_config()["configurable"]
+    assert cfg.get("model") is None
+    assert KEY not in cfg
+    stream.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_cancelled_wrapup_fallback_does_not_leak_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    team = _team()
+    monkeypatch.setattr(team_mod, "get_config", lambda: _config("p/selected"))
+    requests = []
+
+    async def stream_host(request: object, **_kwargs: object) -> dict:
+        requests.append(request)
+        if len(requests) == 1:
+            raise RuntimeError("transient wrap-up failure")
+        if len(requests) == 2:
+            raise asyncio.CancelledError
+        return {"messages": []}
+
+    team_mod.wire_host_dispatch(
+        team,
+        is_team=lambda aid: aid == "host",
+        stream_peer=AsyncMock(return_value={"messages": []}),
+        stream_host=stream_host,
+    )
+    result = team.submit_peer(**_kwargs())
+    assert team.inbox is not None
+    team.inbox.cancel_worker()
+    assert (
+        await team.inbox._synthesize_reply(team.inbox.get(result.job_id), "findings", None) is None
+    )
+
+    request = team_mod.build_one_shot_request(
+        user_id=1, agent_id="host", text="later", source="inbox", thread_id="room"
+    )
+    await team._call_agent("host", request)
+    cfg = requests[2].to_runnable_config()["configurable"]
+    assert cfg.get("model") is None
+    assert KEY not in cfg
